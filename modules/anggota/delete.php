@@ -1,34 +1,34 @@
 <?php
 require_once '../../koneksi.php';
 
-// Pastikan ada parameter ID yang dikirim
-if (isset($_GET['id'])) {
-    $id_anggota = $_GET['id'];
+$id = $_GET['id'] ?? 0;
 
-    // Ambil nama file foto dulu sebelum datanya dihapus
-    $stmt = $pdo->prepare("SELECT foto FROM anggota WHERE id_anggota = ?");
-    $stmt->execute([$id_anggota]);
-    $row = $stmt->fetch();
+if ($id) {
+    // 1. Ambil data untuk mengecek nama file foto
+    $stmtCek = $pdo->prepare("SELECT foto FROM anggota WHERE id_anggota = ?");
+    $stmtCek->execute([$id]);
+    $anggota = $stmtCek->fetch();
 
-    if ($row) {
-        // Proses Hapus Foto Fisik
-        if (!empty($row['foto']) && file_exists('uploads/' . $row['foto'])) {
-            unlink('uploads/' . $row['foto']);
+    if ($anggota) {
+        // 2. Hapus file foto dari folder uploads/ jika ada
+        if (!empty($anggota['foto']) && file_exists("uploads/" . $anggota['foto'])) {
+            unlink("uploads/" . $anggota['foto']);
         }
 
-        // Proses Hapus Data dari Database
-        $stmtDelete = $pdo->prepare("DELETE FROM anggota WHERE id_anggota = ?");
-        $stmtDelete->execute([$id_anggota]);
+        // --- INI TAMBAHAN SAKTINYA BIAR GAK ERROR 1451 ---
+        // 2.5 Bersihin dulu data anak di tabel transaksi yang nyangkut sama id ini
+        $stmtHapusTransaksi = $pdo->prepare("DELETE FROM transaksi WHERE id_anggota = ?");
+        $stmtHapusTransaksi->execute([$id]);
+        // ------------------------------------------------
 
-        // Redirect balik ke index bawa pesan sukses
-        header("Location: index.php?msg=sukses_hapus");
-        exit();
-    } else {
-        header("Location: index.php?msg=data_tidak_ditemukan");
-        exit();
+        // 3. Baru deh aman buat hapus record dari database
+        $stmtDel = $pdo->prepare("DELETE FROM anggota WHERE id_anggota = ?");
+        $stmtDel->execute([$id]);
+
+        header("Location: index.php?msg=Data Anggota berhasil dihapus.");
+        exit;
     }
-} else {
-    header("Location: index.php");
-    exit();
 }
-?>
+
+header("Location: index.php");
+exit;
